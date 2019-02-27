@@ -20,7 +20,7 @@ public class SeamCarver {
     public static void main(String args[]) throws IOException {
 
         //get image file
-        File file = new File("src/Images/city1.jpg");
+        File file = new File("city1.jpg");
         BufferedImage image = ImageIO.read(file);
 
         //get image dimensions
@@ -37,10 +37,10 @@ public class SeamCarver {
 
         Color[][] newImg = sequentialCarve(rgbVals,width,height,newW,newH);
         BufferedImage img = convertToImage(newImg,newW,newH);
-        BufferedImage img2 = optimalCarve(rgbVals,width, height,newW,newH);
+        BufferedImage img2 = optimalCarve2(rgbVals,width, height,newW,newH);
         outputImage(img);
 
-        File file2 = new File("src/Images/OptimalOutput.jpg");
+        File file2 = new File("OptimalOutput.jpg");
         ImageIO.write(img2, "JPEG", file2);
     }
 
@@ -113,6 +113,84 @@ public class SeamCarver {
         }
 
         return crgb;
+    }
+
+    public static BufferedImage optimalCarve2(Color[][]rgbVals, int w, int h, int newW, int newH){
+        //current rgb table
+
+        int wDif = w - newW; //difference between w values
+        int hDif = h - newH;
+        //dp table for entry(i,j) means optimal path for h-i x w-j
+        int[][]dpTable = new int[hDif+1][wDif+1];
+        //results table for output image for each operation
+        Color[][][][] cAr = new Color[hDif+1][wDif+1][hDif+1][wDif+1];
+
+        Color[][] crgb = rgbVals; //current rgb table
+        //initialize first row, (0,0) empty bc no seam carved
+        for (int j = 1; j<=wDif; j++){
+            //can only vertical seam in first row
+            int[][] seamtable = getEnergyArray(crgb, h, w-j+1); //initialize table to energies
+            int[]seam = vSeamDp(seamtable,w-j+1,h); //before seam removal
+            crgb= vSeamCut(crgb,seam,w-j+1,h);
+            dpTable[0][j] = seam[h]; //store cost for the seam
+            cAr[0][j] = crgb;
+            //imAr[0][j] = convertToImage(crgb,w-j, h); //already cut
+        }
+
+        //initialize first column
+        Color[][] crgb2 = rgbVals;
+        for (int i=1; i<=hDif; i++) {
+            //horizontal seams only
+            int[][] seamtable2 = getEnergyArray(crgb2, h-i+1, w); //initialize table to energies
+            int[]seam = hSeamDp(seamtable2,w,h-i+1); //before seam removal
+            crgb2= hSeamCut(crgb2,seam,w,h-i+1);
+            dpTable[i][0] = seam[w]; //store cost for the seam
+            cAr[i][0] = crgb2;
+            //imAr[i][0] = convertToImage(crgb2,w,h-i);
+        }
+
+        //DP magic starts here
+        for (int i=1; i<=hDif; i++) {
+            //System.out.println(i);
+            for (int j=1; j<=wDif; j++){
+                //System.out.println(j);
+                int top = dpTable[i-1][j]; //min cost at cell above (has one less row)
+                int left = dpTable[i][j-1]; //min cost at cell left (one less column)
+
+                //compare costs
+                if (top<=left) { //prefer vertical seams in case of tie
+                    //previous image
+                    //Color[][] tempRgb = getRGBValues(w-j,h-(i-1),(imAr[i-1][j]));
+                    Color[][]tempRgb = cAr[i-1][j];
+                    int[][]tempDp = getEnergyArray(tempRgb,h-(i-1),w-j);
+                    //do horizontal seam
+                    int[]result = hSeamDp(tempDp,w-j,h-(i-1));
+                    dpTable[i][j] = top + result[w-j]; //new cost
+                    //store new image
+                    Color[][]tempR = (hSeamCut(tempRgb,result,w-j,h-i+1));
+                    cAr[i][j] = tempR;
+                    //imAr[i][j] = convertToImage(tempR, w-j,h-i);
+
+                } else { // left < top
+                    //previous image
+                    //Color[][] tempRgb2 = getRGBValues(w-(j-1),h-i,(imAr[i][j-1]));
+                    Color[][] tempRgb2 = cAr[i][j-1];
+                    int[][]tempDp2 = getEnergyArray(tempRgb2,h-i,w-(j-1));
+                    //do vertical seam
+                    int[]result2 = vSeamDp(tempDp2,w-(j-1), h-i);
+                    dpTable[i][j] = left + result2[h-i]; //new cost
+                    //store new image
+                    Color[][] tempR2 = vSeamCut(tempRgb2,result2,w-(j-1),h-i);
+                    cAr[i][j]=tempR2;
+                    //imAr[i][j] = convertToImage(tempR2, w-j,h-i);
+                }
+
+            }
+        }
+        //BufferedImage finalImg= cAr[hDif][wDif];
+        Color[][] finalPic = cAr[hDif][wDif];
+        BufferedImage finalImg = convertToImage(finalPic,newW,newH);
+        return finalImg;
     }
 
     public static BufferedImage optimalCarve(Color[][]rgbVals, int w, int h, int newW, int newH){
@@ -199,6 +277,11 @@ public class SeamCarver {
         return energies;
     }
 
+    // public static int[][] getNewerEnergyPostV(Color[][]rgbVal, int[][]oldEnergy, int[]vSeam, int w, int h){
+    //     int[][]newEnergy;
+    //     return newEnergy;
+    // }
+
     //get the energy of a pixel (i,j)
     public static int getEnergy(Color[][] rgbVals, int i, int j, int w, int h) {
         //energy computed by color difference it has between surrounding pixels
@@ -263,10 +346,10 @@ public class SeamCarver {
                 int top = Integer.MAX_VALUE; //max value if i first row
                 int bot = Integer.MAX_VALUE; //max val if i last row
 
+                int mid = dpTable[i][j-1];  //pixel to mid left
                 if (i>0) { //i not first row
                     top = dpTable[i-1][j-1];  //pixel to top left
                 }
-                int mid = dpTable[i][j-1];  //pixel to mid left
 
                 if (i<h-1) { //not last row
                     bot = dpTable[i+1][j-1]; //pixel to bot left
@@ -414,6 +497,7 @@ public class SeamCarver {
         return newRbg;
     }
 
+//convert rgb table to image
     public static BufferedImage convertToImage(Color[][]rgbVal, int w, int h) {
         BufferedImage image = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
 
@@ -423,15 +507,16 @@ public class SeamCarver {
                 int r = c.getRed();
                 int g = c.getGreen();
                 int b = c.getBlue();
-                int color = (r << 16) | (g << 8) | b;
-                image.setRGB(i, j, color);
+                int color = (r << 16) | (g << 8) | b; //convert color
+                image.setRGB(i, j, color); //set rgb
             }
         }
         return image;
     }
 
+    //output image to file
     public static void outputImage(BufferedImage image) throws IOException {
-        File file = new File("src/Images/SeamCarvedOutput.jpg");
+        File file = new File("SequentialOutput.jpg");
         ImageIO.write(image, "JPEG", file);
     }
 
