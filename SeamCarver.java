@@ -121,13 +121,13 @@ public class SeamCarver {
         int wDif = w - newW; //difference between w values
         int hDif = h - newH;
         //dp table for entry(i,j) means optimal path for h-i x w-j
-        int[][]dpTable = new int[hDif][wDif];
+        int[][]dpTable = new int[hDif+1][wDif+1];
         //results table for output image for each operation
-        BufferedImage[][] imAr = new BufferedImage[hDif][wDif];
+        BufferedImage[][] imAr = new BufferedImage[hDif+1][wDif+1];
 
         Color[][] crgb = rgbVals; //current rgb table
         //initialize first row, (0,0) empty bc no seam carved
-        for (int j = 1; j<wDif; j++){
+        for (int j = 1; j<=wDif; j++){
             //can only vertical seam in first row
             int[][] seamtable = getEnergyArray(crgb, h, w-j+1); //initialize table to energies
             int[]seam = vSeamDp(seamtable,w-j+1,h); //before seam removal
@@ -138,7 +138,7 @@ public class SeamCarver {
 
         //initialize first column
         Color[][] crgb2 = rgbVals;
-        for (int i=1; i<hDif; i++) {
+        for (int i=1; i<=hDif; i++) {
             //horizontal seams only
             int[][] seamtable2 = getEnergyArray(crgb2, h-i+1, w); //initialize table to energies
             int[]seam = hSeamDp(seamtable2,w,h-i+1); //before seam removal
@@ -148,9 +148,10 @@ public class SeamCarver {
         }
 
         //DP magic starts here
-        for (int i=1; i<hDif; i++) {
-            for (int j=1; j<wDif; j++){
-                System.out.println(j);
+        for (int i=1; i<=hDif; i++) {
+            //System.out.println(i);
+            for (int j=1; j<=wDif; j++){
+                //System.out.println(j);
                 int top = dpTable[i-1][j]; //min cost at cell above (has one less row)
                 int left = dpTable[i][j-1]; //min cost at cell left (one less column)
 
@@ -207,11 +208,31 @@ public class SeamCarver {
             Color c2 = rgbVals[i-1][j]; //above
             difference += Math.abs(c1.getRed() - c2.getRed()) +
                     Math.abs(c1.getGreen() - c2.getGreen()) + Math.abs(c1.getBlue() - c2.getBlue());
+            if (j>0){ //top left
+                Color c6 = rgbVals[i-1][j-1];
+                difference += Math.abs(c1.getRed() - c6.getRed()) +
+                        Math.abs(c1.getGreen() - c6.getGreen()) + Math.abs(c1.getBlue() - c6.getBlue());
+            }
+            if (j<w-1) {
+                Color c7 = rgbVals[i-1][j+1]; //top right
+                difference += Math.abs(c1.getRed() - c7.getRed()) +
+                        Math.abs(c1.getGreen() - c7.getGreen()) + Math.abs(c1.getBlue() - c7.getBlue());
+            }
         }
         if (i<h-1) { //not last row
             Color c3 = rgbVals[i+1][j]; //below
             difference+=Math.abs(c1.getRed() - c3.getRed()) +
                     Math.abs(c1.getGreen()-c3.getGreen()) + Math.abs(c1.getBlue() - c3.getBlue());
+            if (j>0){ //bot left
+                Color c8 = rgbVals[i+1][j-1];
+                difference += Math.abs(c1.getRed() - c8.getRed()) +
+                        Math.abs(c1.getGreen() - c8.getGreen()) + Math.abs(c1.getBlue() - c8.getBlue());
+            }
+            if (j<w-1) {
+                Color c9 = rgbVals[i+1][j+1]; //bot right
+                difference += Math.abs(c1.getRed() - c9.getRed()) +
+                        Math.abs(c1.getGreen() - c9.getGreen()) + Math.abs(c1.getBlue() - c9.getBlue());
+            }
         }
         if (j>0) { //not first column
             Color c4 = rgbVals[i][j-1]; //left
